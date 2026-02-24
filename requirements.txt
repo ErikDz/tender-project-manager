@@ -1,0 +1,10 @@
+# Core dependencies
+openai>=1.0.0
+
+# Document parsing (optional but recommended)
+pypdf>=3.0.0
+python-docx>=0.8.11
+openpyxl>=3.0.0
+
+# For better XML parsing (optional)
+lxml>=4.9.0
