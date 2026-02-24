@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase";
 import DocumentUploader from "@/components/DocumentUploader";
 import ProcessingProgress from "@/components/ProcessingProgress";
 import TodoList from "@/components/TodoList";
-import GraphVisualization from "@/components/GraphVisualization";
+import dynamic from "next/dynamic";
+const GraphVisualization = dynamic(() => import("@/components/GraphVisualization"), { ssr: false });
 
 type Tab = "overview" | "documents" | "todos" | "graph";
 
@@ -282,7 +283,7 @@ export default function ProjectDetailPage() {
       )}
 
       {activeTab === "graph" && (
-        <GraphVisualization projectId={projectId} token={token} />
+        <GraphVisualization projectId={projectId} token={token} onUpdate={handleTodoUpdate} />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type Project } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
@@ -14,6 +15,7 @@ const STATUS_DOTS: Record<string, string> = {
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     async function load() {
@@ -60,11 +62,15 @@ export default function ProjectsPage() {
           </thead>
           <tbody className="divide-y divide-border">
             {projects.map((project) => (
-              <tr key={project.id} className="hover:bg-surface-hover transition-colors">
+              <tr
+                key={project.id}
+                onClick={() => router.push(`/projects/${project.id}`)}
+                className="hover:bg-surface-hover transition-colors cursor-pointer"
+              >
                 <td className="px-4 py-3">
-                  <Link href={`/projects/${project.id}`} className="text-foreground hover:text-accent font-medium text-sm">
+                  <span className="text-foreground hover:text-accent font-medium text-sm">
                     {project.name}
-                  </Link>
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-text-secondary">{project.tender_number || "—"}</td>
                 <td className="px-4 py-3">
