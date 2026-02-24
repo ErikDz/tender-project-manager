@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FFFFFF;
+  --surface: #F7F6F3;
+  --surface-hover: #F1F0ED;
+  --surface-active: #E8E5E0;
+  --foreground: #37352F;
+  --text-secondary: #787774;
+  --text-tertiary: #B4B0A8;
+  --border: #E8E5E0;
+  --accent: #2383E2;
+  --accent-light: #E8F0FE;
+  --success: #4DAB9A;
+  --destructive: #EB5757;
+  --warning: #D9880B;
+  --priority-critical: #E03E3E;
+  --priority-high: #D9730D;
+  --priority-medium: #DFAB01;
+  --priority-low: #9B9A97;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-foreground: var(--foreground);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-priority-critical: var(--priority-critical);
+  --color-priority-high: var(--priority-high);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-low: var(--priority-low);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}

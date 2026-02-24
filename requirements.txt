@@ -1,5 +1,6 @@
 # Core dependencies
 openai>=1.0.0
+python-dotenv>=1.0.0
 
 # Document parsing (optional but recommended)
 pypdf>=3.0.0

@@ -89,22 +89,38 @@ EXTRACTION_SCHEMA = {
                         "tags_csv": {
                             "type": "string",
                             "description": "Comma-separated tags"
-                        },
-                        "requires_item": {
-                            "type": "string",
-                            "description": "Title of item this requires (empty if none)"
-                        },
-                        "conditional_on_item": {
-                            "type": "string",
-                            "description": "Title of condition this depends on (empty if none)"
                         }
                     },
-                    "required": ["item_type", "title", "description", "source_text", "source_location", "is_required", "is_checked", "deadline_date", "confidence", "tags_csv", "requires_item", "conditional_on_item"],
+                    "required": ["item_type", "title", "description", "source_text", "source_location", "is_required", "is_checked", "deadline_date", "confidence", "tags_csv"],
+                    "additionalProperties": False
+                }
+            },
+            "relationships": {
+                "type": "array",
+                "description": "Relationships between items. Use exact titles from the items list above.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_title": {
+                            "type": "string",
+                            "description": "Title of the source item (must match an item title exactly)"
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["requires", "conditional_on", "part_of", "references", "depends_on", "triggers", "mutually_exclusive"],
+                            "description": "Type of relationship"
+                        },
+                        "target_title": {
+                            "type": "string",
+                            "description": "Title of the target item (must match an item title exactly)"
+                        }
+                    },
+                    "required": ["source_title", "type", "target_title"],
                     "additionalProperties": False
                 }
             }
         },
-        "required": ["document_summary", "document_type", "items"],
+        "required": ["document_summary", "document_type", "items", "relationships"],
         "additionalProperties": False
     }
 }
@@ -166,6 +182,17 @@ Important:
 - Identify critical items that cause exclusion if missing (Ausschlusskriterium)
 - Set is_required=true for mandatory items, false for optional
 - Use confidence between 0.0 and 1.0 based on how certain you are
+
+RELATIONSHIPS ARE CRITICAL - identify as many as possible:
+- "requires": item A needs item B to be completed (e.g. a total price requires unit prices)
+- "conditional_on": item A only applies if condition B is true (e.g. "falls Bietergemeinschaft")
+- "part_of": item A is a component of item B
+- "references": item A mentions or refers to item B
+- "depends_on": item A cannot start until item B is done
+- "triggers": completing item A activates item B
+- Look for relationships WITHIN this document and to items that may exist in OTHER tender documents
+- Every condition should have at least one item that is conditional_on it
+- Every form/Formblatt should reference the items it collects
 """
 
 
@@ -178,9 +205,10 @@ class RequirementExtractor:
     and across documents.
     """
 
-    def __init__(self, openai_client, model: str = "google/gemini-3-flash-preview"):
+    def __init__(self, openai_client, model: str = None):
+        import os
         self.client = openai_client
-        self.model = model
+        self.model = model or os.environ.get("LLM_MODEL", "google/gemini-3-flash-preview")
         self.processed_documents: set[str] = set()
         logger.info(f"Initialized RequirementExtractor with model: {model}")
 
@@ -261,7 +289,14 @@ class RequirementExtractor:
                 response_text = response.choices[0].message.content
                 logger.debug(f"Response length: {len(response_text)} chars")
 
-                extraction = json.loads(response_text)
+                # Try parsing, with fallback to fix invalid Unicode escapes
+                try:
+                    extraction = json.loads(response_text)
+                except json.JSONDecodeError:
+                    # Fix invalid Unicode escapes that some LLMs produce
+                    import re
+                    cleaned = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', response_text)
+                    extraction = json.loads(cleaned)
                 logger.debug(f"Parsed {len(extraction.get('items', []))} items from response")
 
                 # Success - break out of retry loop
@@ -301,7 +336,7 @@ class RequirementExtractor:
                 # Check if it's a retryable error
                 retryable = any(x in error_str for x in [
                     'rate limit', 'timeout', 'connection', 'temporary',
-                    '429', '500', '502', '503', '504', 'overloaded'
+                    '400', '429', '500', '502', '503', '504', 'overloaded'
                 ])
 
                 if retryable and attempt < max_retries - 1:
@@ -365,55 +400,41 @@ class RequirementExtractor:
             nodes_created.append(node.id)
             title_to_node[item.get("title", "").lower()] = node.id
 
-        # Create edges for relationships (from flattened schema)
-        for item in extraction.get("items", []):
-            source_title = item.get("title", "").lower()
-            source_id = title_to_node.get(source_title)
-
-            if not source_id:
+        # Create edges from top-level relationships array
+        for rel in extraction.get("relationships", []):
+            source_title_raw = rel.get("source_title", "").strip()
+            target_title_raw = rel.get("target_title", "").strip()
+            if not source_title_raw or not target_title_raw:
                 continue
 
-            # Handle requires_item relationship
-            requires_item = item.get("requires_item", "")
-            if requires_item and requires_item.strip():
-                target_title = requires_item.strip().lower()
-                target_id = title_to_node.get(target_title)
+            rel_type = self._map_relationship_type(rel.get("type", "references"))
 
-                # Also search existing graph for target
-                if not target_id:
-                    existing = graph.find_nodes(requires_item.strip())
-                    if existing:
-                        target_id = existing[0].id
+            # Resolve source
+            source_id = title_to_node.get(source_title_raw.lower())
+            if not source_id:
+                existing = graph.find_nodes(source_title_raw)
+                if existing:
+                    source_id = existing[0].id
+            if not source_id:
+                source_id = self._fuzzy_find_node(source_title_raw, title_to_node, graph)
 
-                if target_id and target_id != source_id:
-                    edge = graph.connect(
-                        source_id=source_id,
-                        target_id=target_id,
-                        type=EdgeType.REQUIRES,
-                        description=f"{item.get('title')} requires {requires_item}",
-                    )
-                    edges_created.append(edge.id)
+            # Resolve target
+            target_id = title_to_node.get(target_title_raw.lower())
+            if not target_id:
+                existing = graph.find_nodes(target_title_raw)
+                if existing:
+                    target_id = existing[0].id
+            if not target_id:
+                target_id = self._fuzzy_find_node(target_title_raw, title_to_node, graph)
 
-            # Handle conditional_on_item relationship
-            conditional_on = item.get("conditional_on_item", "")
-            if conditional_on and conditional_on.strip():
-                target_title = conditional_on.strip().lower()
-                target_id = title_to_node.get(target_title)
-
-                # Also search existing graph for target
-                if not target_id:
-                    existing = graph.find_nodes(conditional_on.strip())
-                    if existing:
-                        target_id = existing[0].id
-
-                if target_id and target_id != source_id:
-                    edge = graph.connect(
-                        source_id=source_id,
-                        target_id=target_id,
-                        type=EdgeType.CONDITIONAL_ON,
-                        description=f"{item.get('title')} conditional on {conditional_on}",
-                    )
-                    edges_created.append(edge.id)
+            if source_id and target_id and source_id != target_id:
+                edge = graph.connect(
+                    source_id=source_id,
+                    target_id=target_id,
+                    type=rel_type,
+                    description=f"{source_title_raw} {rel.get('type', 'relates to')} {target_title_raw}",
+                )
+                edges_created.append(edge.id)
 
         self.processed_documents.add(document.path)
 
@@ -526,6 +547,22 @@ class RequirementExtractor:
                     # Merge the nodes
                     graph.merge_duplicate_nodes(doc.id, placeholder.id)
                     break
+
+    def _fuzzy_find_node(self, target_title: str, title_to_node: dict, graph: RequirementGraph) -> Optional[str]:
+        """Try to fuzzy-match a target title against known nodes."""
+        target_lower = target_title.lower()
+
+        # Check current document titles
+        for title, node_id in title_to_node.items():
+            if self._fuzzy_match(target_lower, title, 0.5):
+                return node_id
+
+        # Check all graph nodes
+        for node in graph.nodes.values():
+            if self._fuzzy_match(target_lower, node.title.lower(), 0.5):
+                return node.id
+
+        return None
 
     def _fuzzy_match(self, str1: str, str2: str, threshold: float = 0.6) -> bool:
         """Simple fuzzy string matching."""

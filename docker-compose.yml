@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # Flask API backend
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - FLASK_DEBUG=true
+      - SUPABASE_URL=http://supabase-kong:8000
+    volumes:
+      - ./backend:/app/backend
+      - ./core:/app/core
+      - ./ai:/app/ai
+      - uploads:/app/uploads
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+
+  # Next.js frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=http://localhost:5001/api
+    depends_on:
+      - backend
+
+  # Supabase services (use supabase start for local dev instead)
+  # For production, use Supabase Cloud or self-hosted setup.
+  # During development, run: supabase start
+  # This provides: PostgreSQL, Auth, Storage, Realtime, REST API
+
+volumes:
+  uploads:

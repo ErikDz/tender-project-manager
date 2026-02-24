@@ -47,6 +47,7 @@ class DocumentReader:
     SUPPORTED_EXTENSIONS = {
         '.pdf', '.docx', '.xlsx', '.xml', '.txt', '.csv',
         '.html', '.htm', '.md', '.json', '.x83', '.d83',
+        '.xsl', '.aidocdef', '.aidoc', '.aiform',
     }
 
     def __init__(self):
@@ -113,7 +114,7 @@ class DocumentReader:
                 result = self._read_docx(path)
             elif extension == '.xlsx':
                 result = self._read_xlsx(path)
-            elif extension == '.xml':
+            elif extension in ('.xml', '.xsl', '.aidocdef', '.aidoc', '.aiform'):
                 result = self._read_xml(path)
             elif extension in ('.txt', '.md', '.csv', '.json'):
                 result = self._read_text(path)

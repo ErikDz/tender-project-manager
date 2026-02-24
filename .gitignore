@@ -1,6 +1,28 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
+
+# Environment
 .env
+.env.local
+
+# OS
 .DS_Store
+
+# Data & uploads
 data/
+uploads/
+
+# Node
+node_modules/
+frontend/.next/
+frontend/out/
+
+# Supabase local
+supabase/.temp/
+
+# IDE
+.idea/
+.vscode/

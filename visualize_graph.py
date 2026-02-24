@@ -356,6 +356,7 @@ def generate_html_report(graph: RequirementGraph, output_path: str) -> str:
         mermaid.initialize({{
             startOnLoad: false,
             theme: 'default',
+            maxTextSize: 500000,
             flowchart: {{
                 useMaxWidth: false,
                 htmlLabels: true,

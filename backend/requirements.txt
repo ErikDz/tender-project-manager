@@ -1,0 +1,23 @@
+# Core dependencies
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# Document parsing
+pypdf>=3.0.0
+python-docx>=0.8.11
+openpyxl>=3.0.0
+lxml>=4.9.0
+
+# Web framework
+flask>=3.0
+flask-cors>=4.0
+gunicorn>=21.2
+
+# Supabase
+supabase>=2.0.0
+
+# File watching
+watchdog>=4.0
+
+# Testing
+pytest>=7.0
